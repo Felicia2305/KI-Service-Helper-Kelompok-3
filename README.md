@@ -1,4 +1,4 @@
-# KI-Service-Helper
+# KI-Academic-Service-Helper
 
 Sistem manajemen layanan mahasiswa berbasis **FastAPI + PostgreSQL** dengan fitur autentikasi, antrian tiket, dan digital signature untuk keamanan data.
 
@@ -59,6 +59,28 @@ Sistem ini digunakan untuk:
 - Cryptography (Digital Signature)
 
 ---
+
+## API Endpoint
+Swagger UI: http://127.0.0.1:8000/docs
+ReDoc: http://127.0.0.1:8000/redoc
+
+---
+
+## 🔐 Fitur Keamanan
+Role-based access control (Mahasiswa / Staff)
+Digital signature untuk integritas tiket
+Audit logging aktivitas penting
+
+---
+
+## 👥 Pembagian Tugas (sesuai PBL)
+Benadeo → Analisis & proposal
+Marcell → Design & architecture
+Felicia → Backend + Database + Digital Signature
+Tim (Bareng) → Report & Paper
+
+---
+
 
 ## 🐘 Setup Database (Docker)
 
