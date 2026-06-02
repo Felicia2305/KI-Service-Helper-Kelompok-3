@@ -1,0 +1,8 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.env
+certs/*.pem
+03_Source_Code/backend/.venv/
