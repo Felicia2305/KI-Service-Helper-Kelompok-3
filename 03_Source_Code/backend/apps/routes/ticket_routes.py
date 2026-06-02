@@ -16,10 +16,10 @@ from ..digital_signature.key_manager import KeyManager
 
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
+
+_MAX_FILE_SIZE = 10485760
+
 @router.get("/{ticket_id}/verify-integrity")
-
-_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
-
 def verify_ticket(
     ticket_id: UUID,
     db: Session = Depends(get_db),
