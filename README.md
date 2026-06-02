@@ -35,6 +35,18 @@ Struktur proyek mengikuti standar PBL sebagai berikut:
 └── Scientific_Paper/
 
 
+---
+title: KI Service Helper
+emoji: 🛡️
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+# KI-Academic-Service-Helper
+Sistem manajemen layanan mahasiswa berbasis FastAPI + PostgreSQL.
+
 
 ---
 
