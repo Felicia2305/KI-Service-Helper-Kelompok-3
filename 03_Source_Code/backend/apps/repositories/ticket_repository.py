@@ -5,7 +5,7 @@ from ..models.ticket_model import Ticket
 from ..models.service_type_model import ServiceType
 # Import tambahan untuk integrasi keamanan
 from ..security.crypto_service import CryptoService
-from digital_signature.signer import Signer 
+from ..digital_signature.signer import Signer 
 
 class TicketRepository:
     def __init__(self, db: Session, crypto: CryptoService = None, signer: Signer = None):
