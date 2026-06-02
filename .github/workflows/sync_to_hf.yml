@@ -16,22 +16,23 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # 1. Hapus folder yang mengandung file binary (PDF/PNG)
+          # 1. Hapus folder dokumen agar tidak ditolak HF
           rm -rf "01_Proposal_&_Analisis"
           rm -rf "02_Design_Documents"
-          rm -rf ".github" # Folder workflow juga tidak perlu di HF
+          rm -rf ".github"
 
-          # 2. RESET TOTAL RIWAYAT GIT (PENTING!)
-          # Ini akan membuat seolah-olah riwayat file binary tidak pernah ada
+          # 2. Reset total riwayat Git
           rm -rf .git
           git init
           git config user.email "felicia2305@example.com"
           git config user.name "Felicia2305"
           
-          # 3. Masukkan semua file sisa (hanya kode) ke dalam commit baru
+          # 3. PASTIKAN NAMA BRANCH ADALAH main
+          git checkout -b main
+          
+          # 4. Masukkan semua file dan commit
           git add .
           git commit -m "Deploy clean code to Hugging Face"
 
-          # 4. Paksa kirim (Force Push) ke Hugging Face
-          # Kita gunakan -f karena kita telah me-reset riwayatnya
+          # 5. Push paksa ke Hugging Face branch main
           git push --force https://Felicia2305:$HF_TOKEN@huggingface.co/spaces/Felicia2305/ki-service-helper main
