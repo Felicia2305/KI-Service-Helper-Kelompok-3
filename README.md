@@ -1,3 +1,15 @@
+---
+title: KI Service Helper
+emoji: 🛡️
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+# IPB Academic Service Helper
+Backend API untuk layanan mahasiswa.
+
 # KI-Academic-Service-Helper
 
 Sistem manajemen layanan mahasiswa berbasis **FastAPI + PostgreSQL** dengan fitur autentikasi, antrian tiket, dan digital signature untuk keamanan data.
@@ -33,19 +45,6 @@ Struktur proyek mengikuti standar PBL sebagai berikut:
 ├── Monitoring_P7/
 ├── Final_Technical_Report/
 └── Scientific_Paper/
-
-
----
-title: KI Service Helper
-emoji: 🛡️
-colorFrom: blue
-colorTo: green
-sdk: docker
-pinned: false
----
-
-# KI-Academic-Service-Helper
-Sistem manajemen layanan mahasiswa berbasis FastAPI + PostgreSQL.
 
 
 ---
