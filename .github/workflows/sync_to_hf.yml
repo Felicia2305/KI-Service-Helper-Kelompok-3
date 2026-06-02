@@ -18,5 +18,15 @@ jobs:
         run: |
           git config --global user.email "felicia2305@example.com"
           git config --global user.name "Felicia2305"
-          # Kita gunakan force push agar sejarah commit disamakan
+          
+          # MENGHAPUS FOLDER DOKUMEN YANG TIDAK DIBUTUHKAN SERVER HF
+          # Kita hapus agar tidak ditolak karena file binary (PDF/PNG)
+          rm -rf "01_Proposal_&_Analisis"
+          rm -rf "02_Design_Documents"
+          
+          # Commit perubahan sementara ini (hanya di dalam environment GitHub Action)
+          git add .
+          git commit -m "Clean up docs for Hugging Face deployment" || echo "No changes to commit"
+          
+          # Push paksa ke Hugging Face
           git push --force https://Felicia2305:$HF_TOKEN@huggingface.co/spaces/Felicia2305/ki-service-helper main
