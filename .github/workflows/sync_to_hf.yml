@@ -16,17 +16,22 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git config --global user.email "felicia2305@example.com"
-          git config --global user.name "Felicia2305"
-          
-          # MENGHAPUS FOLDER DOKUMEN YANG TIDAK DIBUTUHKAN SERVER HF
-          # Kita hapus agar tidak ditolak karena file binary (PDF/PNG)
+          # 1. Hapus folder yang mengandung file binary (PDF/PNG)
           rm -rf "01_Proposal_&_Analisis"
           rm -rf "02_Design_Documents"
+          rm -rf ".github" # Folder workflow juga tidak perlu di HF
+
+          # 2. RESET TOTAL RIWAYAT GIT (PENTING!)
+          # Ini akan membuat seolah-olah riwayat file binary tidak pernah ada
+          rm -rf .git
+          git init
+          git config user.email "felicia2305@example.com"
+          git config user.name "Felicia2305"
           
-          # Commit perubahan sementara ini (hanya di dalam environment GitHub Action)
+          # 3. Masukkan semua file sisa (hanya kode) ke dalam commit baru
           git add .
-          git commit -m "Clean up docs for Hugging Face deployment" || echo "No changes to commit"
-          
-          # Push paksa ke Hugging Face
+          git commit -m "Deploy clean code to Hugging Face"
+
+          # 4. Paksa kirim (Force Push) ke Hugging Face
+          # Kita gunakan -f karena kita telah me-reset riwayatnya
           git push --force https://Felicia2305:$HF_TOKEN@huggingface.co/spaces/Felicia2305/ki-service-helper main
