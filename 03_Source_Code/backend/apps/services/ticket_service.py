@@ -1,6 +1,7 @@
+from sqlalchemy.orm import Session 
 from ..repositories.ticket_repository import TicketRepository
 from ..security.crypto_service import CryptoService
-from ..digital_signature.signer import Signer
+from .digital_signature.signer import Signer
 from ..digital_signature.key_manager import KeyManager
 from ..config import settings
 
