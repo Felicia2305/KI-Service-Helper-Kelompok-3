@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     MAIL_PORT: int = 587
 
     UPLOAD_DIR: str = "uploads"
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "https://ki-service-helper-kelompok-3-fe.vercel.app"
     ALLOWED_ORIGINS: str = "http://localhost:5173"
     ENVIRONMENT: str = "development"
     FORCE_HTTPS: bool = False
