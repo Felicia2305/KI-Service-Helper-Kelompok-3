@@ -20,8 +20,8 @@ export const Sidebar = () => {
           <ShieldCheck size={20} />
         </div>
         <div>
-          <p className="font-serif text-2xl leading-none text-white">KI · IPB</p>
-          <p className="mt-1 text-xs text-slate-500">Academic Service Helper</p>
+          <p className="font-serif text-2xl leading-none text-white">IPB Academic Service Helper</p>
+          <p className="mt-1 text-xs text-slate-500">Service Center Terpercaya</p>
         </div>
       </div>
 

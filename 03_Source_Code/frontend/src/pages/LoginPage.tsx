@@ -36,8 +36,8 @@ export const LoginPage = () => {
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-400 text-slate-950"><ShieldCheck size={22} /></div>
               <div>
-                <p className="font-serif text-3xl leading-none">KI · IPB</p>
-                <p className="mt-1 text-sm text-slate-500">Academic Service Helper</p>
+                <p className="font-serif text-3xl leading-none">IPB Academic Service Helper</p>
+                <p className="mt-1 text-sm text-slate-500">Service Center Terpercaya</p>
               </div>
             </div>
             <div className="mt-24 max-w-lg">

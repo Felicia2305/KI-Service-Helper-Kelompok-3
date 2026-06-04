@@ -10,7 +10,7 @@ import { useTickets } from '../hooks/useTickets';
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { tickets, loading } = useTickets();
-  const staff = user?.role !== 'mahasiswa';
+  const staff = user?.role !== 'Mahasiswa';
   const stats = [
     { label: 'Total tiket', value: tickets.length, icon: ClipboardList, tone: 'text-blue-300' },
     { label: 'Pending', value: tickets.filter((ticket) => ticket.status === 'pending').length, icon: Clock, tone: 'text-amber-300' },
