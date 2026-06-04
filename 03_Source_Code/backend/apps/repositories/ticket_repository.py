@@ -16,24 +16,29 @@ class TicketRepository:
     def _decrypt_ticket(self, ticket: Ticket) -> Ticket:
         """Helper untuk mendekripsi data tiket agar bisa dibaca di UI."""
         if ticket and self._crypto:
-            if ticket.purpose:
+            if ticket.purpose_encrypted:
                 try:
-                    ticket.purpose = self._crypto.decrypt(ticket.purpose)
-                except: pass # Jika gagal (data lama tidak terenkripsi), biarkan apa adanya
-            if ticket.catatan_tu:
+                    ticket.purpose = self._crypto.decrypt(ticket.purpose_encrypted)
+                except Exception:
+                    ticket.purpose = ticket.purpose_encrypted
+            if ticket.notes_encrypted:
                 try:
-                    ticket.catatan_tu = self._crypto.decrypt(ticket.catatan_tu)
-                except: pass
+                    ticket.notes = self._crypto.decrypt(ticket.notes_encrypted)
+                except Exception:
+                    ticket.notes = ticket.notes_encrypted
         return ticket
+
+    def get_raw_ticket(self, ticket_id: UUID) -> Ticket | None:
+        return self._db.query(Ticket).filter(Ticket.id == ticket_id).first()
 
     def get_by_id(self, ticket_id: UUID) -> Ticket | None:
         ticket = self._db.query(Ticket).filter(Ticket.id == ticket_id).first()
         return self._decrypt_ticket(ticket)
 
-    def get_by_mahasiswa(self, mahasiswa_id: UUID) -> list[Ticket]:
+    def get_by_mahasiswa(self, user_id: UUID) -> list[Ticket]:
         tickets = (
             self._db.query(Ticket)
-            .filter(Ticket.mahasiswa_id == mahasiswa_id)
+            .filter(Ticket.user_id == user_id)
             .order_by(Ticket.created_at.desc())
             .all()
         )
@@ -46,34 +51,39 @@ class TicketRepository:
         tickets = query.order_by(Ticket.created_at.desc()).all()
         return [self._decrypt_ticket(t) for t in tickets]
 
-    def create(self, mahasiswa_id: UUID, service_type_id: UUID, purpose: str, file_syarat_path: str | None) -> Ticket:
-        # --- LOGIKA KEAMANAN ---
-        # 1. Enkripsi Purpose (Confidentiality)
-        encrypted_purpose = purpose
-        if self._crypto:
-            encrypted_purpose = self._crypto.encrypt(purpose)
-
-        # 2. Buat Digital Signature (Integrity & Non-repudiation)
-        signature = None
-        if self._signer:
-            # Kita tanda tangani gabungan data penting
-            data_to_sign = f"{mahasiswa_id}|{service_type_id}|{encrypted_purpose}"
-            signature = self._signer.sign(data_to_sign)
-        
+    def create_ticket(
+        self,
+        user_id: UUID,
+        service_type_id: UUID,
+        purpose_encrypted: str,
+        notes_encrypted: str | None = None,
+        file_path: str | None = None,
+        digital_signature: str | None = None,
+    ) -> Ticket:
         ticket = Ticket(
-            mahasiswa_id=mahasiswa_id,
+            user_id=user_id,
             service_type_id=service_type_id,
-            purpose=encrypted_purpose, # Simpan hasil enkripsi
-            signature=signature,       # Simpan tanda tangan digital
-            file_syarat_path=file_syarat_path,
-            status="dalam_antrean",
+            purpose_encrypted=purpose_encrypted,
+            notes_encrypted=notes_encrypted,
+            digital_signature=digital_signature,
+            file_path=file_path,
+            status="pending",
         )
         self._db.add(ticket)
         self._db.commit()
         self._db.refresh(ticket)
-        
-        # Dekripsi kembali sebelum dikembalikan ke controller agar user melihat teks asli
         return self._decrypt_ticket(ticket)
+
+    def create(self, mahasiswa_id: UUID, service_type_id: UUID, purpose: str, file_syarat_path: str | None = None) -> Ticket:
+        encrypted_purpose = self._crypto.encrypt(purpose) if self._crypto else purpose
+        signature = None
+        return self.create_ticket(
+            user_id=mahasiswa_id,
+            service_type_id=service_type_id,
+            purpose_encrypted=encrypted_purpose,
+            file_path=file_syarat_path,
+            digital_signature=signature,
+        )
 
     def update_status(self, ticket: Ticket, status: str, catatan_tu: str | None = None) -> Ticket:
         ticket.status = status
@@ -83,25 +93,29 @@ class TicketRepository:
             # --- LOGIKA KEAMANAN ---
             # Enkripsi catatan staf sebelum disimpan
             if self._crypto:
-                ticket.catatan_tu = self._crypto.encrypt(catatan_tu)
+                ticket.notes_encrypted = self._crypto.encrypt(catatan_tu)
             else:
-                ticket.catatan_tu = catatan_tu
+                ticket.notes_encrypted = catatan_tu
                 
         self._db.commit()
         self._db.refresh(ticket)
         return self._decrypt_ticket(ticket)
 
-    # ... (fungsi claim_next, has_active_ticket, dll tetap sama, 
-    # jangan lupa panggil self._decrypt_ticket(ticket) sebelum return) ...
+    def claim_specific(self, ticket: Ticket, staff_id: UUID) -> Ticket:
+        ticket.status = "claimed"
+        ticket.claimed_by = staff_id
+        ticket.updated_at = datetime.now(timezone.utc)
+        self._db.commit()
+        self._db.refresh(ticket)
+        return self._decrypt_ticket(ticket)
 
-    def claim_next(self, staff_id: UUID, staff_level: str) -> Ticket | None:
+    def claim_next(self, staff_id: UUID, staff_level: str | None = None) -> Ticket | None:
         ticket = (
             self._db.query(Ticket)
             .join(ServiceType, Ticket.service_type_id == ServiceType.id)
             .filter(
-                Ticket.status == "dalam_antrean",
-                Ticket.assigned_to == None,
-                ServiceType.level == staff_level,
+                Ticket.status == "pending",
+                Ticket.claimed_by == None,
             )
             .order_by(Ticket.created_at.asc())
             .with_for_update(skip_locked=True)
@@ -110,8 +124,8 @@ class TicketRepository:
         if not ticket:
             return None
 
-        ticket.status = "diproses"
-        ticket.assigned_to = staff_id
+        ticket.status = "claimed"
+        ticket.claimed_by = staff_id
         ticket.updated_at = datetime.now(timezone.utc)
         self._db.commit()
         self._db.refresh(ticket)

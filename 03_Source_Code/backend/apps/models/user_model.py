@@ -26,8 +26,10 @@ class User(Base):
     )
 
     submitted_tickets = relationship(
-        "Ticket", foreign_keys="Ticket.mahasiswa_id", back_populates="mahasiswa"
+        "Ticket", foreign_keys="Ticket.user_id", back_populates="mahasiswa"
     )
     assigned_tickets = relationship(
-        "Ticket", foreign_keys="Ticket.assigned_to", back_populates="assigned_staff"
+        "Ticket", foreign_keys="Ticket.claimed_by", back_populates="assigned_staff"
     )
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="user")

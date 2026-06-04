@@ -5,42 +5,36 @@ from fastapi import APIRouter, Depends, Form, UploadFile, File, Request, HTTPExc
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..dependencies import get_current_user, require_staff
+from ..dependencies import get_current_user, require_role, require_staff
 from ..models.user_model import User
 from ..services.ticket_service import TicketService
 from ..services.auth_service import AuthService
+from ..services.audit_service import AuditService
 from ..schemas.ticket_schema import TicketResponse, TicketRejectRequest, TicketApproveRequest
 from ..config import settings
-from ..digital_signature.verifier import Verifier
-from ..digital_signature.key_manager import KeyManager
+from ..limiter import limiter
 
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
 
-_MAX_FILE_SIZE = 10485760
+_MAX_FILE_SIZE = 5 * 1024 * 1024
+_ALLOWED_MIME = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 @router.get("/{ticket_id}/verify-integrity")
 def verify_ticket(
     ticket_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    # 1. Ambil data mentah dari DB (yang masih terenkripsi)
-    ticket = TicketService(db).repo.get_raw_ticket(ticket_id) 
-    
-    # 2. Siapkan data yang seharusnya di-sign
-    data_to_verify = f"{ticket.mahasiswa_id}|{ticket.service_type_id}|{ticket.purpose}"
-    
-    # 3. Muat Public Key
-    public_key = KeyManager.load_public_key(settings.PUBLIC_KEY_PATH)
-    
-    # 4. Verifikasi
-    is_valid = Verifier.verify(public_key, data_to_verify, ticket.signature)
-    
-    if is_valid:
-        return {"status": "valid", "message": "Integritas data terjamin. Tanda tangan cocok."}
-    else:
-        raise HTTPException(status_code=400, detail="Data telah dimanipulasi atau tanda tangan tidak sah!")
+    result = TicketService(db).verify_ticket_integrity(ticket_id)
+    AuditService(db).log_event(current_user.id, "verify_signature", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket_id), "valid": result["valid"]})
+    return result
 
 
 def _safe_path(upload_dir: str, relative_path: str) -> Path:
@@ -52,16 +46,20 @@ def _safe_path(upload_dir: str, relative_path: str) -> Path:
 
 
 @router.post("", response_model=TicketResponse, status_code=201)
+@limiter.limit("10/minute")
 async def submit_ticket(
+    request: Request,
     service_type_id: UUID = Form(...),
     purpose: str = Form(..., max_length=2000),
+    notes: str | None = Form(None, max_length=2000),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if file and file.size and file.size > _MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="Ukuran file maksimal 10MB.")
-    return await TicketService(db).submit(current_user, service_type_id, purpose, file)
+    _validate_upload(file)
+    ticket = await TicketService(db).submit(current_user, service_type_id, purpose, file, notes)
+    AuditService(db).log_event(current_user.id, "create_ticket", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket.id)})
+    return ticket
 
 
 @router.get("/my", response_model=list[TicketResponse])
@@ -78,6 +76,17 @@ def all_tickets(
     return TicketService(db).get_all_tickets(current_user, status)
 
 
+@router.post("/claim", response_model=TicketResponse)
+async def claim_ticket(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    ticket = await TicketService(db).claim_next(current_user)
+    AuditService(db).log_event(current_user.id, "claim_ticket", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket.id)})
+    return ticket
+
+
 @router.get("/{ticket_id}", response_model=TicketResponse)
 def ticket_detail(
     ticket_id: UUID,
@@ -87,54 +96,58 @@ def ticket_detail(
     return TicketService(db).get_ticket_detail(current_user, ticket_id)
 
 
-@router.post("/claim", response_model=TicketResponse)
-async def claim_ticket(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_staff),
-):
-    return await TicketService(db).claim_next(current_user)
-
-
 @router.post("/{ticket_id}/claim", response_model=TicketResponse)
 async def claim_specific_ticket(
     ticket_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    return await TicketService(db).claim_specific(current_user, ticket_id)
+    ticket = await TicketService(db).claim_specific_for_user(current_user, ticket_id)
+    AuditService(db).log_event(current_user.id, "claim_ticket", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket_id)})
+    return ticket
 
 
 @router.patch("/{ticket_id}/approve", response_model=TicketResponse)
 async def approve_ticket(
     ticket_id: UUID,
     body: TicketApproveRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    return await TicketService(db).approve(current_user, ticket_id, body.catatan_tu)
+    ticket = await TicketService(db).approve(current_user, ticket_id, body.notes or body.catatan_tu)
+    AuditService(db).log_event(current_user.id, "approve_ticket", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket_id)})
+    return ticket
 
 
 @router.patch("/{ticket_id}/reject", response_model=TicketResponse)
 async def reject_ticket(
     ticket_id: UUID,
     body: TicketRejectRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    return await TicketService(db).reject(current_user, ticket_id, body.catatan_tu)
+    ticket = await TicketService(db).reject(current_user, ticket_id, body.notes or body.catatan_tu)
+    AuditService(db).log_event(current_user.id, "reject_ticket", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket_id)})
+    return ticket
 
 
 @router.patch("/{ticket_id}/complete", response_model=TicketResponse)
 async def complete_ticket(
     ticket_id: UUID,
-    file: UploadFile = File(...),
+    request: Request,
+    file: UploadFile | None = File(None),
+    notes: str | None = Form(None, max_length=2000),
     catatan_tu: str | None = Form(None, max_length=2000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff),
 ):
-    if file.size and file.size > _MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="Ukuran file maksimal 10MB.")
-    return await TicketService(db).complete(current_user, ticket_id, file, catatan_tu)
+    _validate_upload(file)
+    ticket = await TicketService(db).complete(current_user, ticket_id, file, notes or catatan_tu)
+    AuditService(db).log_event(current_user.id, "complete_ticket", "ticket", request.client.host if request.client else None, {"ticket_id": str(ticket_id)})
+    return ticket
 
 
 @router.get("/{ticket_id}/download-syarat")
@@ -174,3 +187,12 @@ def download_hasil(
         raise HTTPException(status_code=404, detail="Dokumen hasil belum tersedia.")
     full_path = _safe_path(settings.UPLOAD_DIR, ticket.file_hasil_path)
     return FileResponse(str(full_path), filename=os.path.basename(str(full_path)))
+
+
+def _validate_upload(file: UploadFile | None) -> None:
+    if not file:
+        return
+    if file.content_type not in _ALLOWED_MIME:
+        raise HTTPException(status_code=400, detail="Format file tidak diizinkan.")
+    if file.size and file.size > _MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Ukuran file maksimal 5MB.")
